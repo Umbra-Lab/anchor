@@ -1,8 +1,8 @@
-import { Commitment, PublicKey } from "@solana/web3.js";
-import { Coder } from "../coder/index.js";
+import { PublicKey } from "@solana/web3.js";
 import { IdlEvent, IdlField } from "../idl.js";
-import Provider from "../provider.js";
+import { Coder } from "../coder/index.js";
 import { DecodeType } from "./namespace/types.js";
+import Provider from "../provider.js";
 
 const PROGRAM_LOG = "Program log: ";
 const PROGRAM_DATA = "Program data: ";
@@ -73,8 +73,7 @@ export class EventManager {
 
   public addEventListener(
     eventName: string,
-    callback: (event: any, slot: number, signature: string) => void,
-    commitment?: Commitment
+    callback: (event: any, slot: number, signature: string) => void
   ): number {
     let listener = this._listenerIdCount;
     this._listenerIdCount += 1;
@@ -117,8 +116,7 @@ export class EventManager {
             });
           }
         }
-      },
-      commitment
+      }
     );
 
     return listener;

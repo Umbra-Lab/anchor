@@ -1174,30 +1174,17 @@ impl<'ty> ConstraintGroupBuilder<'ty> {
         if self.init.is_some() {
             return Err(ParseError::new(c.span(), "init already provided"));
         }
-
-        // Require a known account type that implements the `Discriminator` trait so that we can
-        // get the discriminator length dynamically
-        if !matches!(
-            &self.f_ty,
-            Some(Ty::Account(_) | Ty::LazyAccount(_) | Ty::AccountLoader(_))
-        ) {
-            return Err(ParseError::new(
-                c.span(),
-                "`zero` constraint requires the type to implement the `Discriminator` trait",
-            ));
-        }
         self.zeroed.replace(c);
         Ok(())
     }
 
     fn add_realloc(&mut self, c: Context<ConstraintRealloc>) -> ParseResult<()> {
         if !matches!(self.f_ty, Some(Ty::Account(_)))
-            && !matches!(self.f_ty, Some(Ty::LazyAccount(_)))
             && !matches!(self.f_ty, Some(Ty::AccountLoader(_)))
         {
             return Err(ParseError::new(
                 c.span(),
-                "realloc must be on an Account, LazyAccount or AccountLoader",
+                "realloc must be on an Account or AccountLoader",
             ));
         }
         if self.mutable.is_none() {
@@ -1243,12 +1230,11 @@ impl<'ty> ConstraintGroupBuilder<'ty> {
 
     fn add_close(&mut self, c: Context<ConstraintClose>) -> ParseResult<()> {
         if !matches!(self.f_ty, Some(Ty::Account(_)))
-            && !matches!(self.f_ty, Some(Ty::LazyAccount(_)))
             && !matches!(self.f_ty, Some(Ty::AccountLoader(_)))
         {
             return Err(ParseError::new(
                 c.span(),
-                "close must be on an Account, LazyAccount or AccountLoader",
+                "close must be on an Account, AccountLoader",
             ));
         }
         if self.mutable.is_none() {

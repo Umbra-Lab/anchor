@@ -435,7 +435,10 @@ export const LangErrorCode = {
 
 export const LangErrorMessage = new Map<number, string>([
   // Instructions.
-  [LangErrorCode.InstructionMissing, "Instruction discriminator not provided"],
+  [
+    LangErrorCode.InstructionMissing,
+    "8 byte instruction identifier not provided",
+  ],
   [
     LangErrorCode.InstructionFallbackNotFound,
     "Fallback functions are not supported",
@@ -611,11 +614,11 @@ export const LangErrorMessage = new Map<number, string>([
   ],
   [
     LangErrorCode.AccountDiscriminatorNotFound,
-    "No discriminator was found on the account",
+    "No 8 byte discriminator was found on the account",
   ],
   [
     LangErrorCode.AccountDiscriminatorMismatch,
-    "Account discriminator did not match what was expected",
+    "8 byte discriminator did not match what was expected",
   ],
   [LangErrorCode.AccountDidNotDeserialize, "Failed to deserialize the account"],
   [LangErrorCode.AccountDidNotSerialize, "Failed to serialize the account"],

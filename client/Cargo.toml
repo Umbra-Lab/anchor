@@ -13,7 +13,6 @@ rustdoc-args = ["--cfg", "docsrs"]
 [features]
 async = []
 debug = []
-mock = []
 
 [dependencies]
 anchor-lang = { path = "../lang", version = "0.30.1" }

@@ -313,12 +313,7 @@ export class MethodsBuilder<
     }
 
     if (!this._viewFn) {
-      throw new Error(
-        [
-          "Method does not support views.",
-          "The instruction should return a value, and its accounts must be read-only",
-        ].join(" ")
-      );
+      throw new Error("Method does not support views");
     }
 
     // @ts-ignore
@@ -332,7 +327,9 @@ export class MethodsBuilder<
     });
   }
 
-  public async simulate(options?: ConfirmOptions): Promise<SimulateResponse> {
+  public async simulate(
+    options?: ConfirmOptions
+  ): Promise<SimulateResponse<any, any>> {
     if (this._resolveAccounts) {
       await this._accountsResolver.resolve();
     }

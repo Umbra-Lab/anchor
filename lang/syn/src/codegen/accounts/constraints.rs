@@ -1,4 +1,4 @@
-use quote::{format_ident, quote};
+use quote::quote;
 use std::collections::HashSet;
 
 use crate::*;
@@ -198,9 +198,6 @@ pub fn generate_constraint_init(
 }
 
 pub fn generate_constraint_zeroed(f: &Field, _c: &ConstraintZeroed) -> proc_macro2::TokenStream {
-    let account_ty = f.account_ty();
-    let discriminator = quote! { #account_ty::DISCRIMINATOR };
-
     let field = &f.ident;
     let name_str = field.to_string();
     let ty_decl = f.ty_decl(true);
@@ -208,9 +205,10 @@ pub fn generate_constraint_zeroed(f: &Field, _c: &ConstraintZeroed) -> proc_macr
     quote! {
         let #field: #ty_decl = {
             let mut __data: &[u8] = &#field.try_borrow_data()?;
-            let __disc = &__data[..#discriminator.len()];
-            let __has_disc = __disc.iter().any(|b| *b != 0);
-            if __has_disc {
+            let mut __disc_bytes = [0u8; 8];
+            __disc_bytes.copy_from_slice(&__data[..8]);
+            let __discriminator = u64::from_le_bytes(__disc_bytes);
+            if __discriminator != 0 {
                 return Err(anchor_lang::error::Error::from(anchor_lang::error::ErrorCode::ConstraintZero).with_account_name(#name_str));
             }
             #from_account_info
@@ -260,13 +258,6 @@ pub fn generate_constraint_has_one(
         Ty::AccountLoader(_) => quote! {#ident.load()?},
         _ => quote! {#ident},
     };
-    let my_key = match &f.ty {
-        Ty::LazyAccount(_) => {
-            let load_ident = format_ident!("load_{}", target.to_token_stream().to_string());
-            quote! { *#field.#load_ident()? }
-        }
-        _ => quote! { #field.#target },
-    };
     let error = generate_custom_error(
         ident,
         &c.error,
@@ -279,7 +270,7 @@ pub fn generate_constraint_has_one(
     quote! {
         {
             #target_optional_check
-            let my_key = #my_key;
+            let my_key = #field.#target;
             let target_key = #target.key();
             if my_key != target_key {
                 return #error;
@@ -312,13 +303,6 @@ pub fn generate_constraint_raw(ident: &Ident, c: &ConstraintRaw) -> proc_macro2:
 
 pub fn generate_constraint_owner(f: &Field, c: &ConstraintOwner) -> proc_macro2::TokenStream {
     let ident = &f.ident;
-    let maybe_deref = match &f.ty {
-        Ty::Account(AccountTy { boxed, .. })
-        | Ty::InterfaceAccount(InterfaceAccountTy { boxed, .. }) => *boxed,
-        _ => false,
-    }
-    .then(|| quote!(*))
-    .unwrap_or_default();
     let owner_address = &c.owner_address;
     let error = generate_custom_error(
         ident,
@@ -326,10 +310,9 @@ pub fn generate_constraint_owner(f: &Field, c: &ConstraintOwner) -> proc_macro2:
         quote! { ConstraintOwner },
         &Some(&(quote! { *my_owner }, quote! { owner_address })),
     );
-
     quote! {
         {
-            let my_owner = AsRef::<AccountInfo>::as_ref(& #maybe_deref #ident).owner;
+            let my_owner = AsRef::<AccountInfo>::as_ref(&#ident).owner;
             let owner_address = #owner_address;
             if my_owner != &owner_address {
                 return #error;
@@ -562,7 +545,7 @@ fn generate_constraint_init_group(
                 // Define the bump and pda variable.
                 #find_pda
 
-                let #field: #ty_decl = ({ #[inline(never)] || {
+                let #field: #ty_decl = ({#[inline(never)] || {
                     // Checks that all the required accounts for this operation are present.
                     #optional_checks
 
@@ -633,7 +616,7 @@ fn generate_constraint_init_group(
                 // Define the bump and pda variable.
                 #find_pda
 
-                let #field: #ty_decl = ({ #[inline(never)] || {
+                let #field: #ty_decl = ({#[inline(never)] || {
                     // Checks that all the required accounts for this operation are present.
                     #optional_checks
 
@@ -641,19 +624,17 @@ fn generate_constraint_init_group(
                     if !#if_needed || owner_program == &anchor_lang::solana_program::system_program::ID {
                         #payer_optional_check
 
-                        ::anchor_spl::associated_token::create(
-                            anchor_lang::context::CpiContext::new(
-                                associated_token_program.to_account_info(),
-                                ::anchor_spl::associated_token::Create {
-                                    payer: #payer.to_account_info(),
-                                    associated_token: #field.to_account_info(),
-                                    authority: #owner.to_account_info(),
-                                    mint: #mint.to_account_info(),
-                                    system_program: system_program.to_account_info(),
-                                    token_program: #token_program.to_account_info(),
-                                }
-                            )
-                        )?;
+                        let cpi_program = associated_token_program.to_account_info();
+                        let cpi_accounts = ::anchor_spl::associated_token::Create {
+                            payer: #payer.to_account_info(),
+                            associated_token: #field.to_account_info(),
+                            authority: #owner.to_account_info(),
+                            mint: #mint.to_account_info(),
+                            system_program: system_program.to_account_info(),
+                            token_program: #token_program.to_account_info(),
+                        };
+                        let cpi_ctx = anchor_lang::context::CpiContext::new(cpi_program, cpi_accounts);
+                        ::anchor_spl::associated_token::create(cpi_ctx)?;
                     }
                     let pa: #ty_decl = #from_account_info_unchecked;
                     if #if_needed {
@@ -888,7 +869,7 @@ fn generate_constraint_init_group(
                 // Define the bump and pda variable.
                 #find_pda
 
-                let #field: #ty_decl = ({ #[inline(never)] || {
+                let #field: #ty_decl = ({#[inline(never)] || {
                     // Checks that all the required accounts for this operation are present.
                     #optional_checks
 
@@ -946,9 +927,7 @@ fn generate_constraint_init_group(
                                             mint: #field.to_account_info(),
                                         }), #permanent_delegate.unwrap())?;
                                     },
-                                    // All extensions specified by the user should be implemented.
-                                    // If this line runs, it means there is a bug in the codegen.
-                                    _ => unimplemented!("{e:?}"),
+                                    _ => {} // do nothing
                                 }
                             };
                         }
@@ -1033,7 +1012,7 @@ fn generate_constraint_init_group(
                 // Define the bump variable.
                 #find_pda
 
-                let #field = ({ #[inline(never)] || {
+                let #field = ({#[inline(never)] || {
                     // Checks that all the required accounts for this operation are present.
                     #optional_checks
 

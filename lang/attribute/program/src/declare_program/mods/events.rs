@@ -16,6 +16,7 @@ pub fn gen_events_mod(idl: &Idl) -> proc_macro2::TokenStream {
             .expect("Type must exist");
 
         quote! {
+            #[derive(anchor_lang::__private::EventIndex)]
             #ty_def
 
             impl anchor_lang::Event for #name {
@@ -28,7 +29,7 @@ pub fn gen_events_mod(idl: &Idl) -> proc_macro2::TokenStream {
             }
 
             impl anchor_lang::Discriminator for #name {
-                const DISCRIMINATOR: &'static [u8] = &#discriminator;
+                const DISCRIMINATOR: [u8; 8] = #discriminator;
             }
         }
     });

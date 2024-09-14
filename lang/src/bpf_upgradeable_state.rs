@@ -79,6 +79,6 @@ mod idl_build {
 
     impl crate::IdlBuild for ProgramData {}
     impl crate::Discriminator for ProgramData {
-        const DISCRIMINATOR: &'static [u8] = &[];
+        const DISCRIMINATOR: [u8; 8] = [u8::MAX; 8];
     }
 }

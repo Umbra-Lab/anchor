@@ -1,10 +1,12 @@
+use std::path::PathBuf;
+
 use anyhow::{anyhow, Result};
 use heck::CamelCase;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
 use super::{
-    common::{gen_print_section, get_idl_module_path, get_no_docs, get_program_path},
+    common::{gen_print_section, get_idl_module_path, get_no_docs},
     defined::gen_idl_type,
 };
 use crate::{
@@ -32,6 +34,9 @@ pub fn gen_idl_print_fn_program(program: &Program) -> TokenStream {
             let name = ix.ident.to_string();
             let name_pascal = format_ident!("{}", name.to_camel_case());
             let ctx_ident = &ix.anchor_ident;
+            let discriminator = quote! {
+                <crate::instruction::#name_pascal as anchor_lang::Discriminator>::DISCRIMINATOR
+            };
 
             let docs = match &ix.docs {
                 Some(docs) if !no_docs => quote! { vec![#(#docs.into()),*] },
@@ -77,7 +82,7 @@ pub fn gen_idl_print_fn_program(program: &Program) -> TokenStream {
                     #idl::IdlInstruction {
                         name: #name.into(),
                         docs: #docs,
-                        discriminator: crate::instruction::#name_pascal::DISCRIMINATOR.into(),
+                        discriminator: #discriminator.into(),
                         accounts: #ctx_ident::__anchor_private_gen_idl_accounts(
                             &mut accounts,
                             &mut types,
@@ -151,26 +156,10 @@ fn check_safety_comments() -> Result<()> {
         return Ok(());
     }
 
-    let program_path = get_program_path();
-    if program_path.is_err() {
-        // Getting the program path can fail in the following scenarios:
-        //
-        // - Anchor CLI version is incompatible with the current version
-        // - The error is coming from Rust Analyzer when the user has `idl-build` feature enabled,
-        // likely due to enabling all features (https://github.com/coral-xyz/anchor/issues/3042)
-        //
-        // For the first case, we have a warning when the user is using different versions of the
-        // lang and CLI crate. For the second case, users would either have to disable the
-        // `idl-build` feature, or define the program path environment variable in Rust Analyzer
-        // settings.
-        //
-        // Given this feature is not a critical one, and it works by default with `anchor build`,
-        // we can fail silently in the case of an error rather than panicking.
-        return Ok(());
-    }
-
-    program_path
+    std::env::var("ANCHOR_IDL_BUILD_PROGRAM_PATH")
+        .map(PathBuf::from)
         .map(|path| path.join("src").join("lib.rs"))
+        .map_err(|_| anyhow!("Failed to get program path"))
         .map(CrateContext::parse)?
         .map_err(|e| anyhow!("Failed to parse crate: {e}"))?
         .safety_checks()

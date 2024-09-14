@@ -41,13 +41,12 @@ describe("typescript", () => {
     await tx.rpc();
   });
 
-  it("Can use `address` constraint", () => {
-    const ix = program.idl.instructions.find(
-      (ix) => ix.name === "testAddress"
-    )!;
-    expect(ix.accounts.find((acc) => acc.name === "constant")!.address).to.not
-      .be.undefined;
-    expect(ix.accounts.find((acc) => acc.name === "constFn")!.address).to.not.be
-      .undefined;
+  it("Can use relations derivation with seed constant", async () => {
+    await program.methods.testSeedConstant().accounts({}).rpc();
+  });
+
+  it("Can use relations derivation with `address` constraint", () => {
+    // Only compile test for now since the IDL spec doesn't currently support field access
+    // expressions for the `address` constraint
   });
 });
